@@ -1,0 +1,37 @@
+FROM osrf/ros:humble-desktop
+
+# 기본 설정
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 필수 패키지 설치
+RUN apt update && apt install -y \
+    python3-pip \
+    python3-colcon-common-extensions \
+    ros-humble-image-transport \
+    ros-humble-cv-bridge \
+    ros-humble-camera-info-manager \
+    ros-humble-rclpy \
+    ros-humble-sensor-msgs \
+    ros-humble-vision-opencv \
+    ros-humble-rviz2 \
+    ros-humble-xacro \
+    ros-humble-urdf \
+    ros-humble-joint-state-publisher-gui \
+    ros-humble-robot-state-publisher \
+    ros-humble-ur-description \
+    libopencv-dev \
+    git \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 의존성 예시 (필요시 추가)
+RUN pip3 install --no-cache-dir numpy opencv-python pyrealsense2
+
+# 워크스페이스 세팅
+WORKDIR /code
+
+# colcon 빌드 후 source 자동 적용용 entrypoint
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
