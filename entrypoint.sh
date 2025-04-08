@@ -3,10 +3,12 @@ set -e
 
 # ROS2 환경 설정
 source /opt/ros/humble/setup.bash
+source /usr/share/gazebo/setup.sh
 
-# 사용자가 자신의 워크스페이스를 colcon build 했다면 이 부분도 추가할 수 있어
-if [ -f "/code/install/setup.bash" ]; then
-    source /code/install/setup.bash
+# 워크스페이스가 빌드되어 있다면 setup.bash를 source 하기 위한 조건문
+if [ -f "/ros2_ws/install/setup.bash" ]; then
+    source /ros2_ws/install/setup.bash
 fi
 
+# 입력된 명령어 실행
 exec "$@"

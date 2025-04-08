@@ -1,34 +1,110 @@
-FROM osrf/ros:humble-desktop
+# Ubuntu 관련 ------------------------------------------------------------
+ARG UBUNTU_RELEASE=22.04
 
-# 기본 설정
+# CUDA 관련 ------------------------------------------------------------
+ARG CUDA_IMG_VERSION=12.5.1
+ARG CUDA_VERSION=12.5
+ARG CUDA_PURPOSE=devel
+ARG CUDNN_VERSION="cudnn-"
+# ARG CUDNN_VERSION=""
+
+# ROS2 관련 ------------------------------------------------------------
+ARG ROS_VERSION=humble
+ARG GAZEBO_VERSION=fortress
+
+# CUDA Docker 이미지 다운로드 ------------------------------------------------------------
+FROM nvcr.io/nvidia/cuda:${CUDA_IMG_VERSION}-${CUDNN_VERSION}${CUDA_PURPOSE}-ubuntu${UBUNTU_RELEASE}
+
+# 비대화 설치 모드 설정
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 필수 패키지 설치
-RUN apt update && apt install -y \
-    python3-pip \
-    python3-colcon-common-extensions \
-    ros-humble-image-transport \
-    ros-humble-cv-bridge \
-    ros-humble-camera-info-manager \
-    ros-humble-rclpy \
-    ros-humble-sensor-msgs \
-    ros-humble-vision-opencv \
-    ros-humble-rviz2 \
-    ros-humble-xacro \
-    ros-humble-urdf \
-    ros-humble-joint-state-publisher-gui \
-    ros-humble-robot-state-publisher \
-    ros-humble-ur-description \
-    libopencv-dev \
+# 필수 패키지 설치 ------------------------------------------------------------
+RUN apt-get clean && apt-get update && apt-get upgrade -y && apt-get install --no-install-recommends -y \
+    apt-transport-https \
+    apt-utils \
+    build-essential \
+    curl \
     git \
+    locales \
+    software-properties-common \
+    sudo \
     vim \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 의존성 예시 (필요시 추가)
+# 로케일 설정 ------------------------------------------------------------
+RUN locale-gen en_US en_US.UTF-8 && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+
+# ROS2 humble 설치 ------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gnupg2 \
+    lsb-release \
+    software-properties-common \
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \
+    > /etc/apt/sources.list.d/ros2.list
+
+# ROS2 설치 ------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_VERSION}-desktop \
+    ros-${ROS_VERSION}-ros-base \
+    ros-dev-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# ROS2 관련 패키지 설치 ------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Vision 관련
+    libopencv-dev \
+    ros-${ROS_VERSION}-image-transport \
+    ros-${ROS_VERSION}-cv-bridge \
+    ros-${ROS_VERSION}-camera-info-manager \
+    ros-${ROS_VERSION}-vision-opencv \
+    ros-${ROS_VERSION}-sensor-msgs \
+    ros-${ROS_VERSION}-rclpy \
+    # 로봇 설명 및 시각화
+    ros-${ROS_VERSION}-urdf \
+    ros-${ROS_VERSION}-xacro \
+    ros-${ROS_VERSION}-joint-state-publisher-gui \
+    ros-${ROS_VERSION}-robot-state-publisher \
+    ros-${ROS_VERSION}-rviz2 \
+    # 제어 관련
+    ros-${ROS_VERSION}-ros2-control \
+    ros-${ROS_VERSION}-ros2-controllers \
+    ros-${ROS_VERSION}-ament-cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# gazebo 설치 ------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gnupg2 \
+    lsb-release \
+    curl \
+    && mkdir -p /usr/share/keyrings \
+    && curl -sSL https://packages.osrfoundation.org/gazebo.key | gpg --dearmor -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+    > /etc/apt/sources.list.d/gazebo-stable.list
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gazebo-${GAZEBO_VERSION} \
+    libgz-sim9-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 패키지 설치
 RUN pip3 install --no-cache-dir numpy opencv-python pyrealsense2
 
+# rosdep 초기화
+RUN rosdep update
+
 # 워크스페이스 세팅
-WORKDIR /code
+WORKDIR /ros2_ws
+
+# 환경 변수 설정
+RUN echo 'export PATH=/usr/local/cuda-${CUDA_VERSION}/bin:$PATH' >> ~/.bashrc \
+    && echo 'export LD_LIBRARY_PATH=/usr/local/cuda-${CUDA_VERSION}/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc \
+    && echo "source /opt/ros/${ROS_VERSION}/setup.bash" >> ~/.bashrc \
+    && echo "source /usr/share/gazebo/setup.sh" >> ~/.bashrc
 
 # colcon 빌드 후 source 자동 적용용 entrypoint
 COPY ./entrypoint.sh /entrypoint.sh
