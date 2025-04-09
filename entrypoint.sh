@@ -3,7 +3,6 @@ set -e
 
 # ROS2 환경 설정
 source /opt/ros/humble/setup.bash
-source /usr/share/gazebo/setup.sh
 
 # 워크스페이스가 빌드되어 있다면 setup.bash를 source 하기 위한 조건문
 if [ -f "/ros2_ws/install/setup.bash" ]; then

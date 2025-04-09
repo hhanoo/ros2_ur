@@ -2,18 +2,14 @@
 ARG UBUNTU_RELEASE=22.04
 
 # CUDA 관련 ------------------------------------------------------------
-ARG CUDA_IMG_VERSION=12.5.1
-ARG CUDA_VERSION=12.5
+ARG CUDA_VERSION=12.5.1
+ARG CUDA_RELEASE=12.5
 ARG CUDA_PURPOSE=devel
 ARG CUDNN_VERSION="cudnn-"
 # ARG CUDNN_VERSION=""
 
-# ROS2 관련 ------------------------------------------------------------
-ARG ROS_VERSION=humble
-ARG GAZEBO_VERSION=fortress
-
 # CUDA Docker 이미지 다운로드 ------------------------------------------------------------
-FROM nvcr.io/nvidia/cuda:${CUDA_IMG_VERSION}-${CUDNN_VERSION}${CUDA_PURPOSE}-ubuntu${UBUNTU_RELEASE}
+FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-${CUDNN_VERSION}${CUDA_PURPOSE}-ubuntu${UBUNTU_RELEASE}
 
 # 비대화 설치 모드 설정
 ENV DEBIAN_FRONTEND=noninteractive
@@ -26,6 +22,7 @@ RUN apt-get clean && apt-get update && apt-get upgrade -y && apt-get install --n
     curl \
     git \
     locales \
+    python3-pip \
     software-properties-common \
     sudo \
     vim \
@@ -48,9 +45,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     > /etc/apt/sources.list.d/ros2.list
 
 # ROS2 설치 ------------------------------------------------------------
+ARG ROS_VERSION=humble
+ENV ROS_DISTRO=${ROS_VERSION}
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ros-${ROS_VERSION}-desktop \
-    ros-${ROS_VERSION}-ros-base \
+    ros-${ROS_DISTRO}-desktop \
+    ros-${ROS_DISTRO}-ros-base \
     ros-dev-tools \
     && rm -rf /var/lib/apt/lists/*
 
@@ -58,25 +57,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Vision 관련
     libopencv-dev \
-    ros-${ROS_VERSION}-image-transport \
-    ros-${ROS_VERSION}-cv-bridge \
-    ros-${ROS_VERSION}-camera-info-manager \
-    ros-${ROS_VERSION}-vision-opencv \
-    ros-${ROS_VERSION}-sensor-msgs \
-    ros-${ROS_VERSION}-rclpy \
+    ros-${ROS_DISTRO}-image-transport \
+    ros-${ROS_DISTRO}-cv-bridge \
+    ros-${ROS_DISTRO}-camera-info-manager \
+    ros-${ROS_DISTRO}-vision-opencv \
+    ros-${ROS_DISTRO}-sensor-msgs \
+    ros-${ROS_DISTRO}-rclpy \
     # 로봇 설명 및 시각화
-    ros-${ROS_VERSION}-urdf \
-    ros-${ROS_VERSION}-xacro \
-    ros-${ROS_VERSION}-joint-state-publisher-gui \
-    ros-${ROS_VERSION}-robot-state-publisher \
-    ros-${ROS_VERSION}-rviz2 \
+    ros-${ROS_DISTRO}-urdf \
+    ros-${ROS_DISTRO}-xacro \
+    ros-${ROS_DISTRO}-joint-state-publisher-gui \
+    ros-${ROS_DISTRO}-robot-state-publisher \
+    ros-${ROS_DISTRO}-rviz2 \
     # 제어 관련
-    ros-${ROS_VERSION}-ros2-control \
-    ros-${ROS_VERSION}-ros2-controllers \
-    ros-${ROS_VERSION}-ament-cmake \
+    ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-ament-cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # gazebo 설치 ------------------------------------------------------------
+ARG GAZEBO_VERSION=harmonic
+ENV GAZEBO_DISTRO=${GAZEBO_VERSION}
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg2 \
     lsb-release \
@@ -87,15 +88,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     > /etc/apt/sources.list.d/gazebo-stable.list
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gazebo-${GAZEBO_VERSION} \
-    libgz-sim9-dev \
+    gz-${GAZEBO_DISTRO} \
+    ros-${ROS_DISTRO}-ros-gz \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 패키지 설치
 RUN pip3 install --no-cache-dir numpy opencv-python pyrealsense2
 
 # rosdep 초기화
-RUN rosdep update
+RUN rosdep init && rosdep update
 
 # 워크스페이스 세팅
 WORKDIR /ros2_ws
@@ -103,9 +104,8 @@ WORKDIR /ros2_ws
 # 환경 변수 설정
 RUN echo 'export PATH=/usr/local/cuda-${CUDA_VERSION}/bin:$PATH' >> ~/.bashrc \
     && echo 'export LD_LIBRARY_PATH=/usr/local/cuda-${CUDA_VERSION}/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc \
-    && echo "source /opt/ros/${ROS_VERSION}/setup.bash" >> ~/.bashrc \
-    && echo "source /usr/share/gazebo/setup.sh" >> ~/.bashrc
-
+    && echo "source /opt/ros/${ROS_VERSION}/setup.bash" >> ~/.bashrc 
+    
 # colcon 빌드 후 source 자동 적용용 entrypoint
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

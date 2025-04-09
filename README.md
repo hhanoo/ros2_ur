@@ -1,11 +1,11 @@
-# SFSC_vision
-
 ## Environment
 
 ### Docker Environment
-- ROS2 Humble
+- Ubuntu 22.04
+- CUDA 12.5.1
 - Python 3.10
-- CUDA 12.1 or higher
+- ROS2 Humble
+- Gazebo Harmonic
 
 ### Main Libraries
 - PyTorch
@@ -21,7 +21,7 @@
 
 ### Image build
 ```bash
-docker build -t ros2_ur_img -f Dockerfile.ros2 .
+docker build -t ros2:cuda12.5.1-cudnn-ubuntu22.04 -f Dockerfile.ros2 .
 ```
 ### Run
 ```bash
@@ -34,7 +34,7 @@ docker run -it \
     -e DISPLAY=$DISPLAY \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v /dev:/dev \
-    -v /mnt/ssd1/00_Project/ROS2/ros2_ur:/code \
+    -v ~/ros2_ur:/ros2_ws \
     --name ros2_ur \
-    ros2_ur_img
+    ros2:cuda12.5.1-cudnn-ubuntu22.04
 ```
