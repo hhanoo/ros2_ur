@@ -5,20 +5,24 @@ ARG UBUNTU_RELEASE=22.04
 ARG CUDA_VERSION=12.5.1
 ARG CUDA_RELEASE=12.5
 ARG CUDA_PURPOSE=devel
-ARG CUDNN_VERSION="cudnn-"
-# ARG CUDNN_VERSION=""
+# ARG CUDNN_VERSION="cudnn-"
+ARG CUDNN_VERSION=""
 
 # CUDA Docker 이미지 다운로드 ------------------------------------------------------------
 FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-${CUDNN_VERSION}${CUDA_PURPOSE}-ubuntu${UBUNTU_RELEASE}
 
-# 비대화 설치 모드 설정
+# 비대화 설치 모드, NVIDIA 설정 ------------------------------------------------------------
 ENV DEBIAN_FRONTEND=noninteractive
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES all
+ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
 # 필수 패키지 설치 ------------------------------------------------------------
 RUN apt-get clean && apt-get update && apt-get upgrade -y && apt-get install --no-install-recommends -y \
     apt-transport-https \
     apt-utils \
     build-essential \
+    ca-certificates \
     curl \
     git \
     locales \
@@ -79,9 +83,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG GAZEBO_VERSION=harmonic
 ENV GAZEBO_DISTRO=${GAZEBO_VERSION}
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     gnupg2 \
     lsb-release \
-    curl \
     && mkdir -p /usr/share/keyrings \
     && curl -sSL https://packages.osrfoundation.org/gazebo.key | gpg --dearmor -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
@@ -92,21 +96,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-ros-gz \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 패키지 설치
+# GUI / OpenGL / GPU 관련 패키지 설치 --------------------------------------------------
+    RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
+    libxcb-glx0 \
+    libxrender1 \
+    libxi6 \
+    libxtst6 \
+    libxrandr2 \
+    libxinerama1 \
+    libxcursor1 \
+    mesa-utils \
+    x11-apps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 패키지 설치 ------------------------------------------------------------
 RUN pip3 install --no-cache-dir numpy opencv-python pyrealsense2
 
-# rosdep 초기화
+# rosdep 초기화 ------------------------------------------------------------
 RUN rosdep init && rosdep update
 
-# 워크스페이스 세팅
-WORKDIR /ros2_ws
-
-# 환경 변수 설정
+# 환경 변수 설정 ------------------------------------------------------------
 RUN echo 'export PATH=/usr/local/cuda-${CUDA_VERSION}/bin:$PATH' >> ~/.bashrc \
     && echo 'export LD_LIBRARY_PATH=/usr/local/cuda-${CUDA_VERSION}/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc \
-    && echo "source /opt/ros/${ROS_VERSION}/setup.bash" >> ~/.bashrc 
+    && echo "source /opt/ros/${ROS_VERSION}/setup.bash" >> ~/.bashrc
     
-# colcon 빌드 후 source 자동 적용용 entrypoint
+# 워크스페이스 및 엔트리포인트 설정 ------------------------------------------------------------
+WORKDIR /root/ros2_ws
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
